@@ -1,0 +1,24 @@
+{
+  "version_identifier": "phase2-bootstrap-ensemble-20260814",
+  "model_family": "ensemble",
+  "source_phase": "phase2",
+  "decision_threshold": 0.5,
+  "ensemble_weights": {
+    "random_forest": 0.3333333333333333,
+    "gradient_boosting": 0.3333333333333333,
+    "gru": 0.3333333333333333
+  },
+  "artifacts": {
+    "random_forest": "models/phase1/random_forest_4bars.joblib",
+    "gradient_boosting": "models/phase1/hist_gradient_boosting_4bars.joblib",
+    "gru": "models/phase2/gru_4bars.pt"
+  },
+  "target_contract": {
+    "action_space": ["enter", "no_entry"],
+    "market_mode": "spot",
+    "candle_interval": "15m",
+    "horizon_bars": 4,
+    "status": "PROVISIONAL — confirm live interval and spot-only execution mode before production use"
+  },
+  "promotion_source": "Phase 2 fixed equal-weight ensemble; Phase 3 anti-regression gate applies to future candidates"
+}

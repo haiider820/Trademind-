@@ -1,0 +1,132 @@
+{
+  "generated_at_utc": "2026-08-14T10:34:28.639418+00:00",
+  "architecture": "single-layer GRU with LayerNorm and linear output",
+  "architecture_rationale": "GRU retains ordered information with fewer gates/parameters than an LSTM and is more CPU-efficient than a Transformer for a 32-bar offline baseline.",
+  "chronology_contract": {
+    "final_validation_start_utc": "2023-08-20T13:45:00+00:00",
+    "final_holdout_usage": "evaluation only; not used for scaler fit, epoch choice, model fitting, or ensemble-weight selection",
+    "inner_epoch_selection": "chronological inner validation within older Phase 1 training data",
+    "sequence_window_bars": 32,
+    "selected_phase1_target_horizon_bars": 4,
+    "ensemble": "fixed equal-weight average of GRU, Random Forest, and HistGradientBoosting probabilities"
+  },
+  "epoch_selection": {
+    "selected_epoch_count": 8,
+    "history": [
+      {
+        "epoch": 1,
+        "training_loss": 1.206583251582097,
+        "inner_validation_average_precision": 0.14088206321646124,
+        "inner_validation_roc_auc": 0.5699177571539656
+      },
+      {
+        "epoch": 2,
+        "training_loss": 1.1975219802143438,
+        "inner_validation_average_precision": 0.14204834579317763,
+        "inner_validation_roc_auc": 0.572381915950201
+      },
+      {
+        "epoch": 3,
+        "training_loss": 1.1956821876498538,
+        "inner_validation_average_precision": 0.14301581914824588,
+        "inner_validation_roc_auc": 0.5740747189454978
+      },
+      {
+        "epoch": 4,
+        "training_loss": 1.1942930192343544,
+        "inner_validation_average_precision": 0.1439124128481709,
+        "inner_validation_roc_auc": 0.5755143032000296
+      },
+      {
+        "epoch": 5,
+        "training_loss": 1.1930761511551615,
+        "inner_validation_average_precision": 0.14457914671355337,
+        "inner_validation_roc_auc": 0.5766032581770827
+      },
+      {
+        "epoch": 6,
+        "training_loss": 1.1919819406783148,
+        "inner_validation_average_precision": 0.1451267356017602,
+        "inner_validation_roc_auc": 0.5773724358588197
+      },
+      {
+        "epoch": 7,
+        "training_loss": 1.1909913063561246,
+        "inner_validation_average_precision": 0.14556025753383553,
+        "inner_validation_roc_auc": 0.5779439576716063
+      },
+      {
+        "epoch": 8,
+        "training_loss": 1.1900821088163502,
+        "inner_validation_average_precision": 0.14595042048612814,
+        "inner_validation_roc_auc": 0.5784187513170098
+      }
+    ]
+  },
+  "components": [
+    {
+      "component": "gru",
+      "roc_auc": 0.5638902908124246,
+      "average_precision": 0.16357830844928004,
+      "brier_score": 0.21806383995411488,
+      "balanced_accuracy": 0.5383049105715239,
+      "f1": 0.22051926013914813,
+      "precision": 0.16446955430006277,
+      "recall": 0.3345208921106283,
+      "predicted_signal_count": 98766,
+      "predicted_signal_rate": 0.26800570929279666,
+      "label_positive_rate": 0.13176689587053148,
+      "backtest_win_rate": 0.16446955430006277,
+      "mean_future_return": 0.00023545764270238578,
+      "mean_excess_return": -0.008045065216720104
+    },
+    {
+      "component": "random_forest",
+      "roc_auc": 0.578732172669857,
+      "average_precision": 0.16944677203811365,
+      "brier_score": 0.23821874697563106,
+      "balanced_accuracy": 0.5519599263921486,
+      "f1": 0.24332528527204786,
+      "precision": 0.1607678305477412,
+      "recall": 0.5001750447908729,
+      "predicted_signal_count": 151075,
+      "predicted_signal_rate": 0.4099483884272852,
+      "label_positive_rate": 0.13176689587053148,
+      "backtest_win_rate": 0.1607678305477412,
+      "mean_future_return": 0.00011615227413130924,
+      "mean_excess_return": -0.006780517753213644
+    },
+    {
+      "component": "hist_gradient_boosting",
+      "roc_auc": 0.5775247427026461,
+      "average_precision": 0.16842593545587153,
+      "brier_score": 0.2389232357839273,
+      "balanced_accuracy": 0.55199941713745,
+      "f1": 0.24427013583317392,
+      "precision": 0.15908198927243164,
+      "recall": 0.525875738791985,
+      "predicted_signal_count": 160521,
+      "predicted_signal_rate": 0.43558050808364224,
+      "label_positive_rate": 0.13176689587053148,
+      "backtest_win_rate": 0.15908198927243164,
+      "mean_future_return": 0.00015660964709240943,
+      "mean_excess_return": -0.00677452003583312
+    },
+    {
+      "component": "equal_weight_ensemble",
+      "roc_auc": 0.5776643496646315,
+      "average_precision": 0.16898829179412594,
+      "brier_score": 0.2305880091666623,
+      "balanced_accuracy": 0.5482185784625537,
+      "f1": 0.23663774465999826,
+      "precision": 0.1643207148347425,
+      "recall": 0.42264049918655655,
+      "predicted_signal_count": 124896,
+      "predicted_signal_rate": 0.3389105670760497,
+      "label_positive_rate": 0.13176689587053148,
+      "backtest_win_rate": 0.1643207148347425,
+      "mean_future_return": 0.0001573926565470174,
+      "mean_excess_return": -0.007293445989489555
+    }
+  ]
+}

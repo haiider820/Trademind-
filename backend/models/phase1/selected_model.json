@@ -1,0 +1,27 @@
+{
+  "selected_candidate": {
+    "model_name": "random_forest",
+    "horizon_bars": 4,
+    "artifact_path": "models/phase1/random_forest_4bars.joblib",
+    "roc_auc": 0.578732172669857,
+    "average_precision": 0.16944677203811365,
+    "brier_score": 0.23821874697563106,
+    "balanced_accuracy": 0.5519599263921486,
+    "f1": 0.24332528527204786,
+    "precision": 0.1607678305477412,
+    "recall": 0.5001750447908729,
+    "predicted_signal_count": 151075,
+    "predicted_signal_rate": 0.4099483884272852,
+    "label_positive_rate": 0.13176689587053148,
+    "backtest_win_rate": 0.1607678305477412,
+    "mean_future_return": 0.00011615225803820422,
+    "median_future_return": 1.9664233217753235e-05,
+    "mean_excess_return": -0.006780517485457677,
+    "pair_coverage": 1.0,
+    "pair_excess_precision_mean": 0.028953330233924462,
+    "pair_excess_precision_std": 0.005648113632315046,
+    "stability_score": 0.023305216601609415
+  },
+  "selection_rule": "maximize mean minus standard deviation of per-pair excess win rate over each pair's own base rate",
+  "source_metrics": "reports/phase1_validation_metrics.json"
+}
