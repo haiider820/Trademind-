@@ -48,10 +48,13 @@ def interval_ms() -> int:
 async def fetch_pending_outcomes(service: SupabaseService) -> int:
     """Resolve only decisions whose complete forward candle is already available."""
     cutoff = datetime.now(timezone.utc) - timedelta(milliseconds=HORIZON * interval_ms())
+    # Use Z notation in the URL filter; an unescaped '+' in ISO8601 offsets is
+    # decoded as a space by PostgREST query parsing and causes HTTP 400.
+    cutoff_query_value = cutoff.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
     query = (
         "select=id,decision_id,decision_time,symbol,action,input_features,input_window_summary,"
         "target_horizon_bars&outcome_status=eq.pending&decision_time=lte."
-        + cutoff.isoformat()
+        + cutoff_query_value
         + "&order=decision_time.asc&limit=1000"
     )
     pending = await service.select("ml_decision_logs", query=query, use_service_key=True)
