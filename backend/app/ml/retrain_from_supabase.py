@@ -303,10 +303,43 @@ async def run() -> None:
     resolved_now = await fetch_pending_outcomes(service)
     resolved_rows = await fetch_resolved_logs(service)
     if not resolved_rows:
-        raise ValueError("No resolved outcome logs are available for retraining.")
+        # A fresh deployment may have no resolved decisions yet. Treat this as a
+        # successful no-op so the daily job remains observable without risking
+        # an artifact change or masking a real retraining failure.
+        RUN_REPORT.parent.mkdir(parents=True, exist_ok=True)
+        RUN_REPORT.write_text(
+            json.dumps(
+                {
+                    "status": "skipped_no_resolved_outcomes",
+                    "resolved_pending_outcomes": resolved_now,
+                    "resolved_outcome_count": 0,
+                    "promotion_decision": "skipped",
+                    "reason": "No resolved outcome logs are available for retraining.",
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return
     logged = logged_training_frame(resolved_rows)
     if len(logged) < 128:
-        raise ValueError("At least 128 resolved decisions are required for a chronological retraining evaluation.")
+        RUN_REPORT.parent.mkdir(parents=True, exist_ok=True)
+        RUN_REPORT.write_text(
+            json.dumps(
+                {
+                    "status": "skipped_insufficient_resolved_outcomes",
+                    "resolved_pending_outcomes": resolved_now,
+                    "resolved_outcome_count": len(logged),
+                    "promotion_decision": "skipped",
+                    "reason": "At least 128 resolved decisions are required for a chronological retraining evaluation.",
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return
     logged_train, evaluation = chronological_partitions(logged)
     original = original_training_frame()
     label = f"entry_label_{HORIZON}b"

@@ -50,13 +50,24 @@ jobs:
           python -m app.ml.retrain_from_supabase 2>&1 | tee phase4_retrain.log
           status=${PIPESTATUS[0]}
           set -e
-          if [[ "$status" -eq 0 ]]; then
+          if [[ "$status" -ne 0 ]]; then
+            if grep -q "Candidate rejected by out-of-sample anti-regression gate" phase4_retrain.log; then
+              echo "promoted=false" >> "$GITHUB_OUTPUT"
+              echo "Candidate rejected; incumbent bundle remains unchanged."
+            else
+              exit "$status"
+            fi
+          elif python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("phase4_retrain_result.json").read_text())
+          raise SystemExit(0 if report.get("promotion_decision") == "promoted" else 1)
+          PY
+          then
             echo "promoted=true" >> "$GITHUB_OUTPUT"
-          elif grep -q "Candidate rejected by out-of-sample anti-regression gate" phase4_retrain.log; then
-            echo "promoted=false" >> "$GITHUB_OUTPUT"
-            echo "Candidate rejected; incumbent bundle remains unchanged."
           else
-            exit "$status"
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            echo "Retraining completed without promotion; incumbent bundle remains unchanged."
           fi
 
       - name: Commit validated promoted artifacts
