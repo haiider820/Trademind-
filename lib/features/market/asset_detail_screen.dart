@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:trademind_ai/core/theme/app_theme.dart';
+import 'package:trademind_ai/features/common/tm_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:trademind_ai/models/market_candle.dart';
 import 'package:trademind_ai/services/trademind_api_service.dart';
@@ -67,20 +69,34 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.background,
       appBar: AppBar(title: Text(widget.symbol)),
-      body: FutureBuilder<List<MarketCandle>>(
+      body: TmBackground(
+        child: FutureBuilder<List<MarketCandle>>(
         future: _futureCandles,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: TmLoadingState(label: 'Loading candle intelligence'));
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Chart error: ${snapshot.error}'));
+            return const Center(
+              child: TmEmptyState(
+                title: 'Chart unavailable',
+                subtitle: 'Candle data could not be loaded. Pull to retry.',
+                icon: Icons.show_chart,
+              ),
+            );
           }
 
           final candles = snapshot.data ?? const <MarketCandle>[];
           if (candles.isEmpty) {
-            return const Center(child: Text('No OHLC data available.'));
+            return const Center(
+              child: TmEmptyState(
+                title: 'No OHLC data',
+                subtitle: 'There is no candle history for this interval yet.',
+                icon: Icons.candlestick_chart_outlined,
+              ),
+            );
           }
           if (_visibleStart == 0 && _visibleCount == 60) {
             _resetWindow(candles.length);
@@ -113,8 +129,8 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                   '\$${latest.close.toStringAsFixed(4)}  ${isUp ? '▲' : '▼'} ${change.abs().toStringAsFixed(4)} (${changePct.abs().toStringAsFixed(2)}%)',
                   style: TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: isUp ? Colors.greenAccent : Colors.redAccent,
+                    fontWeight: FontWeight.w800,
+                    color: isUp ? AppTheme.mint : AppTheme.magenta,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -241,6 +257,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             ),
           );
         },
+      ),
       ),
     );
   }
@@ -454,27 +471,27 @@ class _CandlestickPainter extends CustomPainter {
     final volumeMax = candles.map((c) => c.volume).fold<double>(0, math.max).clamp(1.0, double.infinity);
 
     final gridPaint = Paint()
-      ..color = Colors.white12
+      ..color = AppTheme.outline.withValues(alpha: 0.42)
       ..strokeWidth = 1;
     final risePaint = Paint()
-      ..color = const Color(0xFF1FE36D)
+      ..color = AppTheme.mint
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
     final fallPaint = Paint()
-      ..color = const Color(0xFFFF5A7A)
+      ..color = AppTheme.magenta
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
-    final riseFill = Paint()..color = const Color(0xFF1FE36D).withValues(alpha: 0.28);
-    final fallFill = Paint()..color = const Color(0xFFFF5A7A).withValues(alpha: 0.28);
-    final volumePaint = Paint()..color = const Color(0xFF5F8CFF).withValues(alpha: 0.35);
+    final riseFill = Paint()..color = AppTheme.mint.withValues(alpha: 0.28);
+    final fallFill = Paint()..color = AppTheme.magenta.withValues(alpha: 0.28);
+    final volumePaint = Paint()..color = AppTheme.purple.withValues(alpha: 0.35);
 
     for (var i = 1; i < 4; i++) {
       final y = chartHeight * i / 4;
       canvas.drawLine(Offset(0, y), Offset(chartWidth, y), gridPaint);
     }
 
-    _drawMovingAverage(canvas, candles, low, range, chartHeight, topPadding, chartWidth, _ChartMath.ema(candles.map((c) => c.close).toList(), 20), const Color(0xFF4D9FFF));
-    _drawMovingAverage(canvas, candles, low, range, chartHeight, topPadding, chartWidth, _ChartMath.ema(candles.map((c) => c.close).toList(), 50), const Color(0xFFFFB84D));
+    _drawMovingAverage(canvas, candles, low, range, chartHeight, topPadding, chartWidth, _ChartMath.ema(candles.map((c) => c.close).toList(), 20), AppTheme.purple);
+    _drawMovingAverage(canvas, candles, low, range, chartHeight, topPadding, chartWidth, _ChartMath.ema(candles.map((c) => c.close).toList(), 50), AppTheme.gold);
 
     for (var i = 0; i < candles.length; i++) {
       final candle = candles[i];
@@ -527,7 +544,7 @@ class _CandlestickPainter extends CustomPainter {
 
       if (isHovered) {
         final glow = Paint()
-          ..color = (isUp ? const Color(0xFF1FE36D) : const Color(0xFFFF5A7A)).withValues(alpha: 0.16)
+          ..color = (isUp ? AppTheme.mint : AppTheme.magenta).withValues(alpha: 0.16)
           ..style = PaintingStyle.fill;
         canvas.drawCircle(Offset(x, (openY + closeY) / 2), bodyWidth * 1.35, glow);
 
@@ -547,7 +564,7 @@ class _CandlestickPainter extends CustomPainter {
         final labelRect = Rect.fromLTWH(chartWidth + 4, labelY, labelWidth, labelHeight);
         canvas.drawRRect(
           RRect.fromRectAndRadius(labelRect, const Radius.circular(8)),
-          Paint()..color = isUp ? const Color(0xFF1FE36D) : const Color(0xFFFF5A7A),
+          Paint()..color = isUp ? AppTheme.mint : AppTheme.magenta,
         );
         labelPainter.paint(canvas, Offset(labelRect.left + 6, labelRect.top + 4));
       }
@@ -577,9 +594,9 @@ class _CandlestickPainter extends CustomPainter {
       textDirection: ui.TextDirection.ltr,
     )..layout();
     legend.paint(canvas, const Offset(8, 4));
-    canvas.drawLine(const Offset(8, 20), const Offset(22, 20), Paint()..color = const Color(0xFF4D9FFF)..strokeWidth = 4);
-    canvas.drawLine(const Offset(62, 20), const Offset(76, 20), Paint()..color = const Color(0xFFFFB84D)..strokeWidth = 4);
-    canvas.drawLine(const Offset(121, 20), const Offset(135, 20), Paint()..color = const Color(0xFF5F8CFF).withValues(alpha: 0.35)..strokeWidth = 4);
+    canvas.drawLine(const Offset(8, 20), const Offset(22, 20), Paint()..color = AppTheme.purple..strokeWidth = 4);
+    canvas.drawLine(const Offset(62, 20), const Offset(76, 20), Paint()..color = AppTheme.gold..strokeWidth = 4);
+    canvas.drawLine(const Offset(121, 20), const Offset(135, 20), Paint()..color = AppTheme.purple.withValues(alpha: 0.35)..strokeWidth = 4);
   }
 
   void _drawMovingAverage(
@@ -662,7 +679,7 @@ class _FloatingHoverInfoCard extends StatelessWidget {
       width: 182,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF151B27).withValues(alpha: 0.94),
+        color: AppTheme.panel.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white12),
         boxShadow: const [
@@ -685,12 +702,12 @@ class _FloatingHoverInfoCard extends StatelessWidget {
           _row(
             'Chg',
             change.toStringAsFixed(4),
-            valueColor: isUp ? const Color(0xFF1FE36D) : const Color(0xFFFF5A7A),
+            valueColor: isUp ? AppTheme.mint : AppTheme.magenta,
           ),
           _row(
             '%Chg',
             '${changePct.toStringAsFixed(2)}%',
-            valueColor: isUp ? const Color(0xFF1FE36D) : const Color(0xFFFF5A7A),
+            valueColor: isUp ? AppTheme.mint : AppTheme.magenta,
           ),
           _row('Range', range.toStringAsFixed(4)),
           _row('Vol', candle.volume.toStringAsFixed(2)),

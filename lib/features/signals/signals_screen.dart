@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:trademind_ai/core/theme/app_theme.dart';
+import 'package:trademind_ai/features/common/tm_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:trademind_ai/models/trade_signal.dart';
 import 'package:trademind_ai/providers/app_providers.dart';
@@ -37,13 +39,13 @@ class _SignalsScreenState extends ConsumerState<SignalsScreen> {
   Color _statusColor(String status) {
     switch (status) {
       case 'tp_hit':
-        return const Color(0xFF1FE36D);
+        return AppTheme.mint;
       case 'sl_hit':
-        return const Color(0xFFFF5A7A);
+        return AppTheme.magenta;
       case 'open':
-        return const Color(0xFFFFB84D);
+        return AppTheme.gold;
       default:
-        return const Color(0xFF7E8AA6);
+        return AppTheme.muted;
     }
   }
 
@@ -103,14 +105,8 @@ class _SignalsScreenState extends ConsumerState<SignalsScreen> {
               label: const Text('New Signal'),
             )
           : null,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.topCenter,
-            radius: 1.3,
-            colors: [Color(0xFF172033), Color(0xFF0A0D14), Color(0xFF070A10)],
-          ),
-        ),
+      backgroundColor: AppTheme.background,
+      body: TmBackground(
         child: SafeArea(
           child: RefreshIndicator(
             onRefresh: _refresh,
@@ -150,12 +146,12 @@ class _SignalsScreenState extends ConsumerState<SignalsScreen> {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    _SignalStatCard(label: 'Open', value: openCount.toString(), accent: const Color(0xFFFFB84D)),
-                    _SignalStatCard(label: 'Closed', value: closedCount.toString(), accent: const Color(0xFF1FE36D)),
+                    _SignalStatCard(label: 'Open', value: openCount.toString(), accent: AppTheme.gold),
+                    _SignalStatCard(label: 'Closed', value: closedCount.toString(), accent: AppTheme.mint),
                     _SignalStatCard(
                       label: 'Access',
                       value: isAdmin ? 'Admin' : 'View',
-                      accent: const Color(0xFF5F8CFF),
+                      accent: AppTheme.purple,
                     ),
                   ],
                 ),

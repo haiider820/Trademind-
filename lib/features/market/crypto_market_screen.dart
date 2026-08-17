@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:trademind_ai/core/theme/app_theme.dart';
+import 'package:trademind_ai/features/common/tm_ui.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:trademind_ai/features/market/asset_detail_screen.dart';
 import 'package:trademind_ai/services/binance_ws_service.dart';
@@ -105,18 +107,8 @@ class _CryptoMarketScreenState extends State<CryptoMarketScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.topCenter,
-            radius: 1.55,
-            colors: [
-              Color(0xFF182133),
-              Color(0xFF0B1018),
-              Color(0xFF070A10),
-            ],
-          ),
-        ),
+      backgroundColor: AppTheme.background,
+      body: TmBackground(
         child: SafeArea(
           child: RefreshIndicator(
             onRefresh: _reload,
@@ -163,19 +155,19 @@ class _CryptoMarketScreenState extends State<CryptoMarketScreen> {
                     _MiniMetric(
                       label: 'Watchlist',
                       value: _favorites.length.toString().padLeft(2, '0'),
-                      color: const Color(0xFFFFB84D),
+                      color: AppTheme.gold,
                     ),
                     const SizedBox(width: 12),
                     _MiniMetric(
                       label: 'Focused',
                       value: _selectedSymbol.replaceAll('USDT', ''),
-                      color: const Color(0xFF5F8CFF),
+                      color: AppTheme.purple,
                     ),
                     const SizedBox(width: 12),
                     _MiniMetric(
                       label: 'Mode',
                       value: _filterTitle,
-                      color: const Color(0xFF1FE36D),
+                      color: AppTheme.mint,
                     ),
                   ],
                 ),
@@ -225,15 +217,12 @@ class _CryptoMarketScreenState extends State<CryptoMarketScreen> {
                   future: _futurePrices,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 32),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
+                      return const TmLoadingState(label: 'Syncing watchlist and live prices');
                     }
                     if (snapshot.hasError) {
-                      return _EmptyState(
+                      return TmEmptyState(
                         title: 'Market load error',
-                        subtitle: '${snapshot.error}',
+                        subtitle: 'The live market stream is unavailable. Pull to retry.',
                         icon: Icons.error_outline,
                       );
                     }
@@ -268,7 +257,7 @@ class _CryptoMarketScreenState extends State<CryptoMarketScreen> {
                     }
 
                     if (filtered.isEmpty) {
-                      return const _EmptyState(
+                      return const TmEmptyState(
                         title: 'No markets found',
                         subtitle: 'Try a broader search or switch the filter.',
                         icon: Icons.search_off,
@@ -388,7 +377,7 @@ class _TickerCard extends StatelessWidget {
     final price = (item['price'] as num?)?.toDouble() ?? 0;
     final change = (item['change_24h'] as num?)?.toDouble() ?? 0;
     final volume = (item['volume_24h'] as num?)?.toDouble() ?? 0;
-    final color = change >= 0 ? const Color(0xFF1FE36D) : const Color(0xFFFF5A7A);
+    final color = change >= 0 ? AppTheme.mint : AppTheme.magenta;
     final seed = _seedFromSymbol(symbol);
     final points = _sparkPoints(seed, change);
 
@@ -548,7 +537,7 @@ class _TickerCard extends StatelessWidget {
                         onPressed: onFavoriteTap,
                         icon: Icon(
                           isFavorite ? Icons.star_rounded : Icons.star_border_rounded,
-                          color: isFavorite ? const Color(0xFFFFB84D) : null,
+                          color: isFavorite ? AppTheme.gold : null,
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -610,7 +599,7 @@ class _MoverRow extends StatelessWidget {
     final symbol = item['symbol']?.toString() ?? '';
     final price = (item['price'] as num?)?.toDouble() ?? 0;
     final change = (item['change_24h'] as num?)?.toDouble() ?? 0;
-    final color = change >= 0 ? const Color(0xFF1FE36D) : const Color(0xFFFF5A7A);
+    final color = change >= 0 ? AppTheme.mint : AppTheme.magenta;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -668,7 +657,7 @@ class _MoverRow extends StatelessWidget {
                 onPressed: onFavoriteTap,
                 icon: Icon(
                   isFavorite ? Icons.star_rounded : Icons.star_border_rounded,
-                  color: isFavorite ? const Color(0xFFFFB84D) : null,
+                  color: isFavorite ? AppTheme.gold : null,
                 ),
               ),
             ],
@@ -686,7 +675,7 @@ class _LiveTickerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = tick.change24h >= 0 ? const Color(0xFF1FE36D) : const Color(0xFFFF5A7A);
+    final color = tick.change24h >= 0 ? AppTheme.mint : AppTheme.magenta;
     return Card(
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -732,8 +721,9 @@ class _LiveTickerCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    '\$${tick.price.toStringAsFixed(tick.price >= 1 ? 2 : 4)}',
+                  TmAnimatedValue(
+                    value: '\$${tick.price.toStringAsFixed(tick.price >= 1 ? 2 : 4)}',
+                    color: AppTheme.text,
                     style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, height: 1.0),
                   ),
                   const SizedBox(height: 6),
@@ -771,29 +761,7 @@ class _MiniMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.84),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: color.withValues(alpha: 0.16)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w900),
-            ),
-          ],
-        ),
-      ),
-    );
+    return TmMetricTile(label: label, value: value, accent: color);
   }
 }
 
@@ -865,37 +833,3 @@ class _MarketFilterChip extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 28),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 44, color: Colors.white54),
-            const SizedBox(height: 12),
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
