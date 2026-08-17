@@ -11,7 +11,7 @@ The endpoint is intended for the existing internal scanner, which evaluates appr
 | Method | Path | Authentication | Purpose |
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/prediction/health` | None | Model readiness, current version, feature-schema hash, sequence length, and audit-store configuration status |
-| `POST` | `/api/v1/prediction/predict` | Supabase bearer token | Score one causal rolling window, return the ensemble decision and version, and persist the decision audit record |
+| `POST` | `/api/v1/prediction/predict` | Dedicated internal service bearer token | Score one causal rolling window, return the ensemble decision and version, and persist the decision audit record |
 
 ## Health response
 
@@ -26,8 +26,7 @@ The endpoint is intended for the existing internal scanner, which evaluates appr
       "ready": true,
       "version_identifier": "phase2-bootstrap-ensemble-20260814",
       "feature_schema_hash": "sha256:derived-from-feature-order",
-      "sequence_window_bars": 32,
-      "artifact_manifest": ".../backend/models/current/model_bundle.json"
+      "sequence_window_bars": 32
     },
     "audit_store_configured": true
   }
@@ -38,7 +37,9 @@ A degraded response has `success: false`, `data.status: "degraded"`, and `data.m
 
 ## Prediction request
 
-`POST /api/v1/prediction/predict` requires `Authorization: Bearer <supabase-access-token>` and accepts:
+`POST /api/v1/prediction/predict` requires `Authorization: Bearer <prediction-service-token>` and accepts:
+
+The token is a dedicated server-to-server credential configured as `PREDICTION_SERVICE_TOKEN`. It is not a Supabase user access token, the Supabase anonymous key, or the Supabase service-role key. The backend compares it in constant time and never logs or returns it. The current repository has no scanner caller wired to this route, so the token must remain provisioned only for the future internal caller and the FastAPI runtime.
 
 ```json
 {
@@ -90,11 +91,19 @@ A successful response returns:
 }
 ```
 
-The route returns `422` for invalid shape, non-finite values, or incompatible model contracts; `401` for missing or invalid authentication; and `503` if the Supabase audit write is unavailable. The route returns only a model decision; the caller remains responsible for any separate trading-policy, risk, balance, and execution checks.
+The route returns `422` with the stable public detail `Invalid prediction request` for invalid JSON shape, non-finite values, oversized bodies, or incompatible request contracts; `401` with `Invalid authentication` for missing or invalid service authentication; `429` with `Prediction rate limit exceeded` and a `Retry-After` header when the process-local limit is exceeded; and `503` with `Prediction service temporarily unavailable` when the service token is unconfigured, model/audit work fails, or the hard timeout expires. These responses do not include exception text, stack traces, file paths, feature values, or model architecture details. The successful response fields are unchanged. The caller remains responsible for any separate trading-policy, risk, balance, and execution checks.
+
+The route enforces exactly **32 rows × 24 columns**, finite numeric values, a **64 KiB** maximum request body, and an **8-second** end-to-end timeout. The default rate limit is **120 requests per 60 seconds per configured service identity**. It is process-local; a multi-worker or multi-instance deployment would require a shared limiter such as Redis for a global limit.
 
 ## Audit records
 
-After successful scoring, the backend writes `ml_model_versions` and an idempotent `ml_decision_logs` row to Supabase using the server-only service-role key. The decision log contains the last-row feature snapshot plus the complete 32-row causal window so the scheduled retraining job can later train the GRU on resolved outcomes. Request logs record the decision ID, symbol, authenticated user ID, action, and model version; they do not log the feature window or service-role credentials.
+After successful scoring, the backend writes `ml_model_versions` and an idempotent `ml_decision_logs` row to Supabase using the server-only service-role key. The decision log contains the last-row feature snapshot plus the complete 32-row causal window so the scheduled retraining job can later train the GRU on resolved outcomes. Request logs record the decision ID, symbol, fixed internal caller label, action, and model version; they do not log the feature window, bearer token, service token, or service-role credentials.
+
+## CORS and runtime settings
+
+CORS has no allowed production origins. Explicit local-development origins are enabled only when `APP_ENV` is `development`, `local`, or `test`, using `CORS_LOCAL_ORIGINS`; the production configuration must set `APP_ENV=production`. Allowed methods and headers are limited to `GET`, `POST`, `OPTIONS`, `Authorization`, and `Content-Type`.
+
+The hardening settings are environment-driven: `PREDICTION_SERVICE_TOKEN`, `PREDICTION_RATE_LIMIT_WINDOW_SECONDS`, `PREDICTION_RATE_LIMIT_MAX_REQUESTS`, `PREDICTION_MAX_BODY_BYTES`, `PREDICTION_TIMEOUT_SECONDS`, and `CORS_LOCAL_ORIGINS`. The service token is intentionally blank in source control and must be provisioned in the runtime secret store.
 
 ## Daily retraining workflow
 

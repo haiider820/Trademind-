@@ -85,7 +85,6 @@ class ModelBundle:
             "version_identifier": self.version_identifier,
             "feature_schema_hash": self.feature_schema_hash,
             "sequence_window_bars": int(self.gru_artifact["sequence_window_bars"]),
-            "artifact_manifest": str(self.manifest_path),
         }
 
     def score(self, feature_window: list[list[float]]) -> EnsembleScore:

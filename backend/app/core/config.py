@@ -62,6 +62,21 @@ class Settings(BaseSettings):
     ml_serving_horizon_bars: int = 4
     ml_serving_require_audit: bool = True
 
+    # Prediction route security. The service token is server-only and must be provisioned
+    # in the runtime secret store; it is intentionally blank in source control.
+    prediction_service_token: str = ""
+    prediction_rate_limit_window_seconds: int = 60
+    prediction_rate_limit_max_requests: int = 120
+    prediction_max_body_bytes: int = 65536
+    prediction_timeout_seconds: float = 8.0
+
+    # Browser CORS is disabled outside local development. These explicit origins are only
+    # useful for a local browser build and are never enabled by production app environments.
+    cors_local_origins: str = (
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:8080,http://127.0.0.1:8080"
+    )
+
     # Public Kaggle source approved for Phase 1 historical OHLCV acquisition.
     ml_kaggle_dataset: str = "andreidiaconescu/binancepricedata"
     ml_kaggle_dataset_version: int = 3

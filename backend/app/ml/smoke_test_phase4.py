@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api.deps import AuthUser
 from app.api.v1.endpoints import prediction
+from app.core.config import settings
 from app.ml.dataset import FEATURE_COLUMNS
 from app.ml.model_bundle import get_model_bundle
 
@@ -18,7 +18,8 @@ from app.ml.model_bundle import get_model_bundle
 def main() -> None:
     app = FastAPI()
     app.include_router(prediction.router, prefix="/api/v1/prediction")
-    app.dependency_overrides[prediction.get_current_user] = lambda: AuthUser("smoke-user", "smoke@example.com", "test")
+    original_token = settings.prediction_service_token
+    settings.prediction_service_token = "phase4-smoke-token"
 
     with TestClient(app) as client:
         health = client.get("/api/v1/prediction/health")
@@ -39,6 +40,7 @@ def main() -> None:
                     "feature_window": feature_window,
                     "decision_id": "phase4-smoke-decision",
                 },
+                headers={"Authorization": "Bearer phase4-smoke-token"},
             )
         assert response.status_code == 200, response.text
         payload = response.json()["data"]
@@ -46,6 +48,7 @@ def main() -> None:
         assert payload["audit_logged"] is True
         log_decision.assert_awaited_once()
 
+    settings.prediction_service_token = original_token
     print("phase4_smoke=passed")
 
 

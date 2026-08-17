@@ -1,22 +1,48 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.routing import APIRoute
+from pydantic import BaseModel, Field, FiniteFloat, field_validator
 
-from app.api.deps import AuthUser, get_current_user
+from app.api.deps import AuthUser, get_prediction_service_caller
 from app.core.config import settings
 from app.ml.dataset import FEATURE_COLUMNS
 from app.ml.model_bundle import get_model_bundle
 from app.services.supabase_service import SupabaseService
 
 logger = logging.getLogger("trademind.prediction")
-router = APIRouter()
+
+
+class PredictionTimeoutRoute(APIRoute):
+    """Bound the complete prediction request, including dependency resolution and audit writes."""
+
+    def get_route_handler(self):
+        original_route_handler = super().get_route_handler()
+
+        async def timed_route_handler(request: Request):
+            try:
+                async with asyncio.timeout(settings.prediction_timeout_seconds):
+                    return await original_route_handler(request)
+            except TimeoutError as exc:
+                logger.warning("prediction_request_timeout")
+                raise HTTPException(
+                    status_code=503,
+                    detail="Prediction service temporarily unavailable",
+                ) from exc
+
+        return timed_route_handler
+
+
+router = APIRouter(route_class=PredictionTimeoutRoute)
+_rate_limit_state: dict[str, tuple[float, int]] = {}
 
 
 class PredictionRequest(BaseModel):
@@ -25,8 +51,17 @@ class PredictionRequest(BaseModel):
     symbol: str = Field(min_length=5, max_length=20, pattern=r"^[A-Z0-9]+$")
     decision_time: datetime
     entry_price: float = Field(gt=0)
-    feature_window: list[list[float]] = Field(min_length=1)
+    feature_window: list[list[FiniteFloat]] = Field(min_length=1)
     decision_id: str | None = Field(default=None, min_length=8, max_length=120)
+
+    @field_validator("feature_window")
+    @classmethod
+    def validate_feature_window(cls, value: list[list[FiniteFloat]]) -> list[list[FiniteFloat]]:
+        if len(value) != settings.ml_sequence_window_bars or any(
+            len(row) != len(FEATURE_COLUMNS) for row in value
+        ):
+            raise ValueError("Invalid prediction request")
+        return value
 
 
 class PredictionResponse(BaseModel):
@@ -58,6 +93,35 @@ def _model_version_payload(bundle: Any) -> dict[str, Any]:
         },
         "lifecycle_status": "incumbent",
     }
+
+
+def _enforce_rate_limit(caller_id: str) -> None:
+    """Apply a bounded process-local limit; shared infrastructure is needed for multi-worker limits."""
+    now = time.monotonic()
+    window_seconds = settings.prediction_rate_limit_window_seconds
+    max_requests = settings.prediction_rate_limit_max_requests
+
+    # This route has one configured service identity, but prune expired keys so a future
+    # caller-identity extension cannot grow this dictionary without bound.
+    expired = [
+        key
+        for key, (window_start, _) in _rate_limit_state.items()
+        if now - window_start >= window_seconds
+    ]
+    for key in expired:
+        _rate_limit_state.pop(key, None)
+
+    window_start, count = _rate_limit_state.get(caller_id, (now, 0))
+    if now - window_start >= window_seconds:
+        window_start, count = now, 0
+    if count >= max_requests:
+        retry_after = max(1, int(window_seconds - (now - window_start)))
+        raise HTTPException(
+            status_code=429,
+            detail="Prediction rate limit exceeded",
+            headers={"Retry-After": str(retry_after)},
+        )
+    _rate_limit_state[caller_id] = (window_start, count + 1)
 
 
 async def _log_decision(
@@ -134,30 +198,37 @@ async def prediction_health() -> dict[str, Any]:
 @router.post("/predict", response_model=dict[str, Any])
 async def predict(
     request: PredictionRequest,
-    user: AuthUser = Depends(get_current_user),
+    caller: AuthUser = Depends(get_prediction_service_caller),
 ) -> dict[str, Any]:
     """Score the Phase 2 ensemble and append the decision to the Supabase audit store."""
+    _enforce_rate_limit(caller.id)
     decision_id = request.decision_id or str(uuid4())
     logger.info(
         "prediction_request_received",
-        extra={"decision_id": decision_id, "symbol": request.symbol, "user_id": user.id},
+        extra={"decision_id": decision_id, "symbol": request.symbol, "caller_id": caller.id},
     )
     try:
         bundle = get_model_bundle()
         score = bundle.score(request.feature_window)
         await _log_decision(request, bundle, score, decision_id)
-    except (FileNotFoundError, ValueError) as exc:
+    except ValueError as exc:
         logger.warning(
             "prediction_request_rejected",
             extra={"decision_id": decision_id, "symbol": request.symbol, "error_type": type(exc).__name__},
         )
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except (RuntimeError, httpx.HTTPError) as exc:
+        raise HTTPException(status_code=422, detail="Invalid prediction request") from exc
+    except (FileNotFoundError, RuntimeError, httpx.HTTPError) as exc:
         logger.exception(
-            "prediction_audit_write_failed",
-            extra={"decision_id": decision_id, "symbol": request.symbol},
+            "prediction_service_unavailable",
+            extra={"decision_id": decision_id, "symbol": request.symbol, "error_type": type(exc).__name__},
         )
-        raise HTTPException(status_code=503, detail="Prediction audit store unavailable") from exc
+        raise HTTPException(status_code=503, detail="Prediction service temporarily unavailable") from exc
+    except Exception as exc:  # pragma: no cover - defensive public error boundary
+        logger.exception(
+            "prediction_service_failed",
+            extra={"decision_id": decision_id, "symbol": request.symbol, "error_type": type(exc).__name__},
+        )
+        raise HTTPException(status_code=503, detail="Prediction service temporarily unavailable") from exc
 
     logger.info(
         "prediction_request_completed",
